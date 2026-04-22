@@ -1,169 +1,188 @@
-# TRELLIS.2 for Apple Silicon
+# TRELLIS.2 MPS for Apple Silicon
 
-> This private `t7r0n/trellis2-mps` package preserves the locally validated
-> MPS/Metal TRELLIS.2 port used in the production workspace. Read
-> [MPS_PORT_NOTES.md](MPS_PORT_NOTES.md) for the exact provenance, patches,
-> validation results, known limits, and excluded heavyweight files. This repo is
-> source-only: model weights, generated outputs, local envs, caches, and secrets
-> are intentionally not committed.
+This repository is an Apple Silicon/MPS compatibility package for Microsoft
+TRELLIS.2 image-to-3D generation. It keeps the original TRELLIS.2 source in
+`TRELLIS.2/`, adds Mac-focused runtime patches and backends, and documents the
+exact local validation used to run image-to-3D generation on this Mac.
 
-Run [TRELLIS.2](https://github.com/microsoft/TRELLIS) image-to-3D generation natively on Mac.
+The original Microsoft project remains the authority for TRELLIS.2 model
+architecture, training details, and upstream research context:
 
-This is a port of Microsoft's TRELLIS.2 — a state-of-the-art image-to-3D model — from CUDA-only to Apple Silicon via PyTorch MPS. No NVIDIA GPU required.
+- Original repo: https://github.com/microsoft/TRELLIS.2
+- Upstream README preserved here: [UPSTREAM_README.md](UPSTREAM_README.md)
+- Detailed Mac port notes: [MPS_PORT_NOTES.md](MPS_PORT_NOTES.md)
 
-## Results
+This repo is source-only. It does not include model weights, Hugging Face
+caches, `.env` files, virtual environments, generated GLB/OBJ outputs, or local
+secrets.
 
-Generates **400K+ vertex meshes with baked PBR textures** from a single image in **~5 minutes 40 seconds on M4 Pro** (24GB, cold start, weights cached, cool machine). Of that, ~3m 52s is actual generation and baking — the remaining ~1m 45s is pipeline load that happens once per Python process.
+## Current Status
 
-Output is a GLB with base-color, metallic, and roughness textures — ready for use in 3D applications.
+Validated on Apple Silicon with PyTorch MPS and Metal texture baking:
 
-### Example
+- TRELLIS.2 image-to-3D generation works locally on MPS for the validated smoke
+  path.
+- Dense attention and sparse attention run through PyTorch SDPA.
+- Sparse convolution runs through a pure PyTorch fallback.
+- Mesh extraction and GLB postprocessing run without NVIDIA CUDA.
+- The validated image-to-3D path produced a textured GLB that passed Blender
+  asset validation.
 
-**Input image** &rarr; **Generated 3D mesh** (~400K vertices, ~800K triangles) with Metal-baked PBR textures:
+Validated smoke output:
 
-<p>
-<img src="assets/shoe_input.png" width="180">
-<img src="assets/shoe_front.png" width="220">
-<img src="assets/shoe_3q.png" width="260">
-<img src="assets/shoe_side.png" width="220">
+- Input: `assets/shoe_input.png`
+- Pipeline: `512`
+- Seed: `42`
+- Texture size: `512`
+- Output GLB from the original workspace: 7.6 MB
+- Blender validation: 1 mesh, 1 material, 153,708 vertices, 197,529 triangles,
+  no findings
+
+Manifest: [manifests/trellis_mac_probe.json](manifests/trellis_mac_probe.json)
+
+## Astronaut Example
+
+This visual shows a normalized astronaut input image on the left and a rotating
+review of the generated 3D asset on the right.
+
+<p align="center">
+  <img src="assets/astronaut/astronaut_input_to_3d_turntable.gif" alt="Astronaut input image and generated 3D asset turntable" width="960">
 </p>
+
+Additional astronaut review files:
+
+- Input reference: [assets/astronaut/astronaut_input_front.png](assets/astronaut/astronaut_input_front.png)
+- Generated asset contact sheet: [assets/astronaut/astronaut_generated_contact_sheet.png](assets/astronaut/astronaut_generated_contact_sheet.png)
+
+The astronaut asset was generated from a single front reference and visually
+reviewed as a generated asset. It is useful as a smoke-test example for the Mac
+pipeline, not as a claim that single-image generation fully reconstructs a
+production astronaut suit from all sides.
+
+## What Changed for Mac/MPS
+
+- Attention defaults use PyTorch SDPA instead of CUDA-only attention packages.
+- Sparse convolution uses a pure PyTorch gather/scatter backend.
+- Mesh extraction uses a Python fallback instead of CUDA hash-map kernels.
+- The generated mesh can be simplified before texture baking to avoid
+  Metal-side instability on very large decoder meshes.
+- Texture baking prefers the available Metal path and can fall back to a
+  Python/xatlas/KDTree baker.
+- Hard CUDA device assumptions in the vendored TRELLIS.2 source were patched to
+  use the active local device where possible.
+- `generate.py` selects the Mac-safe backends before importing TRELLIS.2.
+- `generate.py` can load a Hugging Face token from a local `.env` without
+  printing secret values.
 
 ## Requirements
 
-- macOS on Apple Silicon (M1 or later)
-- Python 3.11+
-- 24GB+ unified memory recommended (the 4B model is large)
-- ~15GB disk space for model weights (downloaded on first run)
-
-## Quick Start
+- Apple Silicon Mac.
+- Python 3.11+ recommended.
+- `uv` recommended.
+- PyTorch with MPS support.
+- Xcode command line tools.
+- Xcode Metal toolchain for the accelerated texture baking path:
 
 ```bash
-# Clone this repo
+xcodebuild -downloadComponent MetalToolchain
+```
+
+- Hugging Face access to:
+  - `microsoft/TRELLIS.2-4B`
+  - `facebook/dinov3-vitl16-pretrain-lvd1689m`
+  - `briaai/RMBG-2.0`
+
+First-time use downloads large model weights through Hugging Face. Those weights
+are governed by their upstream model licenses and are not redistributed here.
+
+## Setup
+
+```bash
 git clone git@github.com:t7r0n/trellis2-mps.git
 cd trellis2-mps
 
-# (Recommended) Download the Xcode Metal Toolchain so setup can build the
-# Metal-accelerated texture baker. Without this, setup falls back to a pure
-# Python KDTree baker (slower, slightly lower quality).
-xcodebuild -downloadComponent MetalToolchain
-
-# Log into HuggingFace (needed for gated model weights)
-hf auth login
-
-# Request access to these gated models (usually instant approval):
-#   https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m
-#   https://huggingface.co/briaai/RMBG-2.0
-
-# Run setup (creates venv, installs deps, clones & patches TRELLIS.2,
-# builds Metal backends if the toolchain is available)
 bash setup.sh
-
-# Activate the environment
 source .venv/bin/activate
-
-# Generate a 3D model from an image
-python generate.py path/to/image.png
 ```
 
-To skip the Metal build (for example on older hardware or to speed up setup):
+Authenticate with Hugging Face:
+
+```bash
+hf auth login
+```
+
+Or create a local `.env` file:
+
+```bash
+HF_TOKEN=hf_xxx
+```
+
+To skip the Metal build and use the Python texture-baking fallback:
 
 ```bash
 SKIP_METAL=1 bash setup.sh
 ```
 
-Output files are saved to the current directory (or use `--output` to specify a path).
-
-## Usage
+## Run the Smoke Test
 
 ```bash
-# Basic usage
-python generate.py photo.png
-
-# With options
-python generate.py photo.png --seed 123 --output my_model --pipeline-type 512
-
-# All options
-python generate.py --help
+python generate.py assets/shoe_input.png \
+  --output outputs/shoe_probe \
+  --pipeline-type 512 \
+  --texture-size 512 \
+  --seed 42
 ```
 
+Expected outputs:
+
+```text
+outputs/shoe_probe.glb
+outputs/shoe_probe.obj
+```
+
+The first run can take a long time because TRELLIS.2, DINOv3, and RMBG weights
+may need to download and load.
+
+## Normal Usage
+
+```bash
+python generate.py path/to/image.png \
+  --output outputs/my_model \
+  --pipeline-type 512 \
+  --texture-size 1024 \
+  --seed 123
+```
+
+Options:
+
 | Option | Default | Description |
-|--------|---------|-------------|
-| `--seed` | 42 | Random seed for generation |
-| `--output` | `output_3d` | Output filename (without extension) |
-| `--pipeline-type` | `512` | Pipeline resolution: `512`, `1024`, `1024_cascade` |
-| `--texture-size` | `1024` | PBR texture resolution: `512`, `1024`, `2048` |
-| `--no-texture` | — | Skip texture baking, export geometry only |
+|---|---:|---|
+| `--seed` | `42` | Random seed for generation |
+| `--output` | `output_3d` | Output filename without extension |
+| `--pipeline-type` | `512` | Pipeline resolution: `512`, `1024`, or `1024_cascade` |
+| `--texture-size` | `1024` | PBR texture resolution: `512`, `1024`, or `2048` |
+| `--no-texture` | off | Skip texture baking and export geometry only |
 
-## What Was Ported
+## Known Limits
 
-TRELLIS.2 depends on several CUDA-only libraries. This port replaces each of them with a backend that runs on Apple Silicon:
+- This is an inference-focused Mac compatibility package, not a full CUDA
+  rewrite of every upstream kernel.
+- Very high-resolution modes can exceed 24 GB unified memory.
+- The pure PyTorch sparse convolution fallback is slower than CUDA kernels.
+- Some tiny mesh holes may remain because CUDA-only hole-filling paths are not
+  fully reproduced.
+- Meshes may be pre-simplified before texture baking to avoid Metal-side
+  instability on very dense decoder output.
+- Training is not supported in this Mac package.
+- DINOv3 and RMBG are separate model dependencies with separate license terms.
 
-| Original (CUDA) | Replacement | Purpose |
-|---|---|---|
-| `flex_gemm` | `backends/conv_none.py` | Sparse 3D convolution via gather-scatter (pure PyTorch) |
-| `o_voxel._C` hashmap | `backends/mesh_extract.py` | Mesh extraction from dual voxel grid (pure Python) |
-| `flash_attn` | PyTorch SDPA | Scaled dot-product attention for sparse transformers |
-| `cumesh` | Skipped during decode | Called on meshes large enough to crash the Metal port; replaced with `fast_simplification` before baking |
-| `nvdiffrast` | `mtldiffrast` (Metal) with pure-Python fallback | Differentiable rasterization for texture baking |
+## Licenses and Attribution
 
-Additionally, all hardcoded `.cuda()` calls throughout the codebase were patched to use the active device instead.
+This package keeps upstream licensing and attributions:
 
-### Technical Details
+- [LICENSE](LICENSE)
+- [TRELLIS.2/LICENSE](TRELLIS.2/LICENSE)
+- [UPSTREAM_README.md](UPSTREAM_README.md)
 
-**Sparse 3D Convolution** (`backends/conv_none.py`): Implements submanifold sparse convolution by building a spatial hash of active voxels, gathering neighbor features for each kernel position, applying weights via matrix multiplication, and scatter-adding results back. Neighbor maps are cached per-tensor to avoid redundant computation.
-
-**Mesh Extraction** (`backends/mesh_extract.py`): Reimplements `flexible_dual_grid_to_mesh` using Python dictionaries instead of CUDA hashmap operations. Builds a coordinate-to-index lookup table, finds connected voxels for each edge, and triangulates quads using normal alignment heuristics.
-
-**Attention** (patched `full_attn.py`): Adds an SDPA backend to the sparse attention module. Pads variable-length sequences into batches, runs `torch.nn.functional.scaled_dot_product_attention`, then unpads results.
-
-**Texture Baking**: By default we use the Metal stack released by [@pedronaugusto](https://github.com/pedronaugusto) — [`mtldiffrast`](https://github.com/pedronaugusto/mtldiffrast), [`mtlbvh`](https://github.com/pedronaugusto/mtlbvh), [`mtlmesh`](https://github.com/pedronaugusto/mtlmesh), and his CPU fork of [`o_voxel`](https://github.com/pedronaugusto/trellis2-apple) — which exposes `o_voxel.postprocess.to_glb`. We pre-simplify the decoder mesh to ~200K faces with `fast_simplification` before handing it to the Metal BVH (the BVH builder is unstable on 800K+ face inputs). If the Metal toolchain is unavailable, we fall back to `backends/texture_baker.py`: xatlas UV unwrap, then a scipy cKDTree + inverse-distance weighting over the sparse voxel grid at native 512 resolution.
-
-## Performance
-
-Benchmarks on M4 Pro (24GB), pipeline type `512`, full Metal stack installed, weights cached. Numbers below are from a fresh-install end-to-end run (`/usr/bin/time -h python generate.py shoe_input.png`). Important: these numbers assume a **cool machine**. M4 Pro throttles aggressively under sustained load, and I've measured the same run taking 6–10× longer when the CPU had already been pinned for an hour before I started.
-
-| Stage | Time |
-|-------|------|
-| Pipeline load (first call per process) | 104s |
-| Sparse structure sampling (12 steps) | 81s |
-| Shape SLat sampling (12 steps) | 22s |
-| Texture SLat sampling (12 steps) | 12s |
-| Mesh decoding + `fast_simplification` (858K → 200K faces) | ~106s |
-| Texture bake (Metal, 1024²) | 11s |
-| **Total wall-clock (cold start)** | **5m 40s** |
-| Generation + bake only (excluding pipeline load) | 3m 52s |
-
-Memory usage peaks at around 18GB unified memory during generation.
-
-First-ever run adds ~15GB of HuggingFace weight downloads (TRELLIS.2, DINOv3, RMBG-2.0) — network-bound, not included above. The pipeline load time is dominated by deserializing those weights from disk; if you batch multiple images in one Python process you pay load once.
-
-With `SKIP_METAL=1` (pure-Python KDTree baker) the texture bake takes ~15s instead of ~11s and coverage near UV chart boundaries is slightly softer. Without the `mtlgemm` Python package specifically, the Metal baker falls back to a `torch.nn.functional.grid_sample` call that can leave mild ring artifacts on curved surfaces; installing `mtlgemm` (done automatically by `setup.sh`) gets rid of them.
-
-## Limitations
-
-- **Hole filling disabled**: Decode-time hole filling requires `cumesh`. The Metal port segfaults on decoder-sized meshes, so we skip this step. Output meshes may have small holes.
-- **Slower than CUDA**: The pure-PyTorch sparse convolution is ~10× slower than the CUDA `flex_gemm` kernel. This is the main inference bottleneck.
-- **Pre-simplified before texture bake**: The mesh is decimated from ~800K to ~200K faces before Metal BVH construction to avoid builder instability. If you need the full-resolution mesh, export it via the OBJ output (which is written before simplification).
-- **No training support**: Inference only.
-
-### On `mtlgemm` / `flex_gemm` and thermal throttling
-
-`setup.sh` installs `mtlgemm` as part of the Metal stack. The baker uses it for sparse attribute sampling inside `o_voxel.postprocess.to_glb`; without it, `generate.py` monkey-patches the one call site with a `torch.nn.functional.grid_sample` fallback, which is correct but leaves mild ring artifacts on curved surfaces. With `mtlgemm` the output matches the CUDA reference implementation.
-
-One thing that burned me during testing: after the M4 Pro had been doing heavy compute for a few hours, the same pipeline slowed from ~3.5 min generation to ~36 min purely from thermal throttling — nothing in the code path changed. If you see unusually slow runs, let the machine cool for a few minutes and retry before blaming the code.
-
-## License
-
-The porting code in this repository (backends, patches, scripts) is released under the MIT License.
-
-Upstream model weights are subject to their own licenses:
-- **TRELLIS.2**: [MIT License](https://github.com/microsoft/TRELLIS.2/blob/main/LICENSE)
-- **DINOv3**: [Meta custom license](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m/blob/main/LICENSE.md) (gated, review before commercial use)
-- **RMBG-2.0**: [CC BY-NC 4.0](https://huggingface.co/briaai/RMBG-2.0) (non-commercial; commercial use requires a license from BRIA)
-
-## Credits
-
-- [TRELLIS.2](https://github.com/microsoft/TRELLIS.2) by Microsoft Research — the original model and codebase
-- [DINOv3](https://github.com/facebookresearch/dinov3) by Meta — image feature extraction
-- [RMBG-2.0](https://github.com/Bria-AI/RMBG-2.0) by BRIA AI — background removal
-- [@pedronaugusto](https://github.com/pedronaugusto) — `mtldiffrast`, `mtlbvh`, `mtlmesh`, and the CPU fork of `o_voxel` that together provide the Metal texture-baking path used by this repo
+Model checkpoints and gated dependencies are governed by their upstream model
+licenses and are not redistributed here.
