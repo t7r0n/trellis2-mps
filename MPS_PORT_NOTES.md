@@ -1,6 +1,6 @@
 # TRELLIS.2 MPS Port Notes
 
-This private package is a source-only Apple Silicon/MPS packaging of Microsoft
+This package is a source-only Apple Silicon/MPS packaging of Microsoft
 TRELLIS.2. It keeps the original upstream source under `TRELLIS.2/` and adds
 local Mac compatibility patches, setup scripts, backends, and validation
 manifests.
