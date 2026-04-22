@@ -1,0 +1,32 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Model/checkpoint/cache material
+checkpoints/
+models/
+weights/
+.cache/
+hf_cache/
+huggingface/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+
+# Generated outputs
+output/
+outputs/
+runs/
+wandb/
+*.obj
+*.glb
+*.gltf
+*.mp4
+*.mov
+*.exr

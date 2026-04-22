@@ -1,0 +1,74 @@
+{
+  "ok": true,
+  "returncode": 0,
+  "env_python": "model_envs/trellis-mac/.venv/bin/python",
+  "repo_path": "raw/model-research/trellis-mac",
+  "trellis_commit": "5565d24",
+  "trellis_mac_commit": "257397f",
+  "stdout": "[ATTENTION] Using backend: sdpa\n[SPARSE] Conv backend: none; Attention backend: sdpa\n  Voxels: 4, channels: 5\n  Building KDTree...\n    Tree built in 0.0s\n  Rasterizing 2 triangles into 32x32...\n    Coverage: 100.0%, rasterized in 0.0s\n  Querying 1,024 texels, k=2...\n    Query done in 0.0s\n  Weighting colors (max_dist = 2.0000)...\n  Final coverage: 100.0%, total bake: 0.0s\n{\"mps_available\": true, \"device\": \"mps\", \"mps_matmul_device\": \"mps:0\", \"hf_token_present\": true, \"gated_access\": {\"facebook/dinov3-vitl16-pretrain-lvd1689m\": \"ok\", \"briaai/RMBG-2.0\": \"ok\"}, \"metal_stack\": {\"mtldiffrast\": true, \"mtlbvh\": true, \"cumesh\": true, \"flex_gemm\": true, \"o_voxel\": \"/Users/tarunadityakusupati/Desktop/container/remotion_2/model_envs/trellis-mac/.venv/lib/python3.11/site-packages/o_voxel/__init__.py\", \"postprocess_backend\": \"metal\", \"postprocess_has_dr\": true, \"postprocess_has_flex_gemm\": true}, \"dense_attention\": {\"shape\": [1, 4, 2, 8], \"device\": \"mps:0\"}, \"sparse_attention\": {\"shape\": [5, 2, 4], \"device\": \"mps:0\"}, \"sparse_conv_none\": {\"shape\": [8, 3], \"device\": \"mps:0\"}, \"mesh_extract_stub\": {\"vertices\": [4, 3], \"faces\": [2, 3]}, \"metal_to_glb\": {\"ok\": true, \"bytes\": 4284, \"vertices\": 24, \"faces\": 12}, \"kdtree_baker\": {\"mask_pixels\": 1024, \"bytes\": 2144}}",
+  "stderr": "/Users/tarunadityakusupati/Desktop/container/remotion_2/raw/model-research/trellis-mac/backends/mesh_extract.py:125: UserWarning: Using torch.cross without specifying the dim arg is deprecated.\nPlease either pass the dim explicitly or simply use torch.linalg.cross.\nThe default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/aten/src/ATen/native/Cross.cpp:67.)\n  n0 = torch.cross(mesh_vertices[a1[:, 1]] - mesh_vertices[a1[:, 0]], mesh_vertices[a1[:, 2]] - mesh_vertices[a1[:, 0]])",
+  "result": {
+    "mps_available": true,
+    "device": "mps",
+    "mps_matmul_device": "mps:0",
+    "hf_token_present": true,
+    "gated_access": {
+      "facebook/dinov3-vitl16-pretrain-lvd1689m": "ok",
+      "briaai/RMBG-2.0": "ok"
+    },
+    "metal_stack": {
+      "mtldiffrast": true,
+      "mtlbvh": true,
+      "cumesh": true,
+      "flex_gemm": true,
+      "o_voxel": "/Users/tarunadityakusupati/Desktop/container/remotion_2/model_envs/trellis-mac/.venv/lib/python3.11/site-packages/o_voxel/__init__.py",
+      "postprocess_backend": "metal",
+      "postprocess_has_dr": true,
+      "postprocess_has_flex_gemm": true
+    },
+    "dense_attention": {
+      "shape": [
+        1,
+        4,
+        2,
+        8
+      ],
+      "device": "mps:0"
+    },
+    "sparse_attention": {
+      "shape": [
+        5,
+        2,
+        4
+      ],
+      "device": "mps:0"
+    },
+    "sparse_conv_none": {
+      "shape": [
+        8,
+        3
+      ],
+      "device": "mps:0"
+    },
+    "mesh_extract_stub": {
+      "vertices": [
+        4,
+        3
+      ],
+      "faces": [
+        2,
+        3
+      ]
+    },
+    "metal_to_glb": {
+      "ok": true,
+      "bytes": 4284,
+      "vertices": 24,
+      "faces": 12
+    },
+    "kdtree_baker": {
+      "mask_pixels": 1024,
+      "bytes": 2144
+    }
+  }
+}
